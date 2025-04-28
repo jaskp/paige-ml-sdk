@@ -72,10 +72,10 @@ def init_datamodule_from_dataset_filepaths(
     test_embeddings_dir: Optional[PathLike] = None,
     label_missing_value: int = -999,
     group_col: Optional[str] = None,
-    filename_extension: str = '.pt',
+    filename_extension: str = ".pt",
     num_workers: int = 0,
     batch_size: int = 1,
-    mode: Literal['csv', 'parquet'] = 'csv',
+    mode: Literal["csv", "parquet", "xlsx"] = "csv",
 ) -> AggregatorDataModule:
     """Construct datasets from their filepaths and intialize a datamodule.
 

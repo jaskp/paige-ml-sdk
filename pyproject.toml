@@ -27,6 +27,8 @@ dependencies = [
     "pandas>=2.0,<3",
     "environs>=9.3,<12",
     "scikit-learn~=1.1",
+    "openpyxl>=3.1.5",
+    "pyarrow>=20.0.0",
 ]
 dynamic = ["version"]
 
@@ -180,3 +182,8 @@ module = [
     "torch.*"
 ]
 implicit_reexport = false
+
+[dependency-groups]
+dev = [
+    "better-exceptions>=0.3.3",
+]

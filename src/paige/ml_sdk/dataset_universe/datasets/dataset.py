@@ -7,12 +7,15 @@ import pandas as pd
 from torch.utils.data import Dataset
 
 from paige.ml_sdk.dataset_universe.datasets.fit import EmbeddingAggregatorFitDatasetItem
-from paige.ml_sdk.dataset_universe.embedding_loader import FileSystemEmbeddingLoader
+from paige.ml_sdk.dataset_universe.embedding_loader import (
+    FileSystemEmbeddingLoader,
+    ParquetEmbeddingLoader,
+)
 
 logger = logging.getLogger(__name__)
 
 
-PathLike = Union[str, Path[str]]
+PathLike = "Union[str, Path[str]]"
 
 
 class EmbeddingDataset(Dataset[EmbeddingAggregatorFitDatasetItem]):
@@ -49,8 +52,12 @@ class EmbeddingDataset(Dataset[EmbeddingAggregatorFitDatasetItem]):
         self.label_missing_value = label_missing_value
         self.embeddings_filename_column = embeddings_filename_column
         self.group_column = group_column or embeddings_filename_column
-        self.embedding_loader = FileSystemEmbeddingLoader(
-            embeddings_dir=str(embeddings_dir), extension=filename_extension
+        self.embedding_loader = (
+            ParquetEmbeddingLoader(embeddings_dir=embeddings_dir)
+            if filename_extension == ".parquet"
+            else FileSystemEmbeddingLoader(
+                embeddings_dir=str(embeddings_dir), extension=filename_extension
+            )
         )
 
         # useful to disable when we need to power through.
@@ -67,11 +74,17 @@ class EmbeddingDataset(Dataset[EmbeddingAggregatorFitDatasetItem]):
         label_missing_value: int,
         group_column: Optional[str] = None,
         validate_all_embeddings_exist: bool = True,
-        filename_extension: str = '.pt',
-        mode: Literal['csv', 'parquet'] = 'csv',
-    ) -> 'EmbeddingDataset':
+        filename_extension: str = ".pt",
+        mode: Literal["csv", "parquet", "xlsx"] = "csv",
+    ) -> "EmbeddingDataset":
         """Instantiates an EmbeddingDataset from a dataset filepath"""
-        reader = pd.read_csv if mode == 'csv' else pd.read_parquet
+        reader = (
+            pd.read_csv
+            if mode == "csv"
+            else pd.read_parquet
+            if mode == "parquet"
+            else pd.read_excel
+        )
         return cls(
             reader(dataset),
             embeddings_dir,
