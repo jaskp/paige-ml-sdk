@@ -9,6 +9,7 @@ from torch.utils.data import Dataset
 from paige.ml_sdk.dataset_universe.datasets.fit import EmbeddingAggregatorFitDatasetItem
 from paige.ml_sdk.dataset_universe.embedding_loader import (
     FileSystemEmbeddingLoader,
+    H5EmbeddingLoader,
     ParquetEmbeddingLoader,
 )
 
@@ -52,13 +53,17 @@ class EmbeddingDataset(Dataset[EmbeddingAggregatorFitDatasetItem]):
         self.label_missing_value = label_missing_value
         self.embeddings_filename_column = embeddings_filename_column
         self.group_column = group_column or embeddings_filename_column
-        self.embedding_loader = (
-            ParquetEmbeddingLoader(embeddings_dir=embeddings_dir)
-            if filename_extension == ".parquet"
-            else FileSystemEmbeddingLoader(
-                embeddings_dir=str(embeddings_dir), extension=filename_extension
-            )
-        )
+        match filename_extension:
+            case ".parquet":
+                self.embedding_loader = ParquetEmbeddingLoader(
+                    embeddings_dir=embeddings_dir
+                )
+            case ".h5":
+                self.embedding_loader = H5EmbeddingLoader(embeddings_dir=embeddings_dir)
+            case _:
+                self.embedding_loader = FileSystemEmbeddingLoader(
+                    embeddings_dir=embeddings_dir, extension=filename_extension
+                )
 
         # useful to disable when we need to power through.
         if validate_all_embeddings_exist:

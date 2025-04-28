@@ -4,6 +4,7 @@ from typing import Callable, Iterable, Optional, Protocol, Union, List
 
 import torch
 import pandas as pd
+import h5py
 from torch import Tensor
 
 PathLike = Union[str, Path]
@@ -72,6 +73,42 @@ def _extract_features_from_df(
     # Extract feature columns and convert to tensor
     features = df[feature_columns].values
     return torch.tensor(features)
+
+
+def load_h5(
+    p: Union[PathLike, Iterable[PathLike]], dataset_name: str = "features"
+) -> Tensor:
+    """Loads embeddings from h5 files containing a features dataset
+
+    Args:
+        p: Path to h5 file or files
+        dataset_name: Name of the dataset containing the features. Defaults to "features".
+
+    Returns:
+        Tensor containing embeddings
+    """
+    if isinstance(p, (str, Path)):
+        with h5py.File(p, "r") as f:
+            if dataset_name not in f:
+                raise ValueError(f"Dataset '{dataset_name}' not found in h5 file {p}")
+            # Convert to tensor and ensure it's a copy since h5py uses lazy loading
+            data = torch.tensor(f[dataset_name][:])
+            if data.ndim > 2:
+                data = data.squeeze(0)
+                assert data.ndim == 2
+            return data
+    else:
+        raise NotImplementedError("Loading multiple h5 files is not implemented")
+        embeddings = []
+        for p_ in p:
+            with h5py.File(p_, "r") as f:
+                if dataset_name not in f:
+                    raise ValueError(
+                        f"Dataset '{dataset_name}' not found in h5 file {p_}"
+                    )
+                # Convert to tensor and ensure it's a copy since h5py uses lazy loading
+                embeddings.append(torch.tensor(f[dataset_name][:]))
+        return torch.cat(embeddings)
 
 
 class EmbeddingNotFoundError(Exception):
@@ -179,6 +216,65 @@ class ParquetEmbeddingLoader(EmbeddingLoader):
                 self.lookup_embeddings_filepath(p) for p in embedding_filename_or_names
             ]
             embeddings = load_parquet(paths, self.feature_columns)
+        return embeddings
+
+    def lookup_embeddings_filepath(self, embedding_filename: str) -> Path:
+        """
+        Finds the embedding filepath.
+
+        Args:
+            embedding_filename: The name of the embeddings file
+
+        Raises:
+            EmbeddingNotFoundError: If no embeddings were found.
+
+        Returns:
+            The path to the embeddings file.
+        """
+        embedding_path = self.embeddings_dir / (embedding_filename + self.extension)
+        if not embedding_path.exists():
+            raise EmbeddingNotFoundError(
+                f"embedding_path {embedding_path} does not exist"
+            )
+
+        return embedding_path
+
+
+class H5EmbeddingLoader(EmbeddingLoader):
+    """Loads embeddings from h5 files containing a features dataset."""
+
+    def __init__(
+        self,
+        embeddings_dir: Union[str, Path],
+        dataset_name: str = "features",
+        extension: str = ".h5",
+    ):
+        """Initialize h5 embedding loader.
+
+        Args:
+            embeddings_dir: Directory expected to contain all h5 embedding files.
+            dataset_name: Name of the dataset containing the features. Defaults to "features".
+            extension: Embeddings file extension. Defaults to `.h5`.
+        """
+        self.embeddings_dir = Path(embeddings_dir)
+        self.dataset_name = dataset_name
+        self.extension = extension
+
+    def load(self, embedding_filename_or_names: Union[str, Iterable[str]]) -> Tensor:
+        """
+        Loads embeddings for a given group name from h5 files.
+
+        Args:
+            embedding_filename_or_names: Identifies the name(s) of the embeddings filepaths to be loaded.
+        """
+        if isinstance(embedding_filename_or_names, str):
+            path = self.lookup_embeddings_filepath(embedding_filename_or_names)
+            embeddings = load_h5(path, self.dataset_name)
+        else:
+            paths = [
+                self.lookup_embeddings_filepath(p) for p in embedding_filename_or_names
+            ]
+            embeddings = load_h5(paths, self.dataset_name)
         return embeddings
 
     def lookup_embeddings_filepath(self, embedding_filename: str) -> Path:

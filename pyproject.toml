@@ -29,6 +29,8 @@ dependencies = [
     "scikit-learn~=1.1",
     "openpyxl>=3.1.5",
     "pyarrow>=20.0.0",
+    "h5py>=3.13.0",
+    "wandb>=0.16.2",
 ]
 dynamic = ["version"]
 
