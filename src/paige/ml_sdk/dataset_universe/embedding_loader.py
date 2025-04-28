@@ -87,6 +87,9 @@ def load_h5(
     Returns:
         Tensor containing embeddings
     """
+    if isinstance(p, list) and len(p) == 1:
+        p = p[0]
+
     if isinstance(p, (str, Path)):
         with h5py.File(p, "r") as f:
             if dataset_name not in f:
