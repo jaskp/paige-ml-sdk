@@ -5,11 +5,50 @@ from typing import Callable, Iterable, Optional, Protocol, Union, List
 import torch
 import pandas as pd
 import h5py
+import zarr
 from torch import Tensor
 
 PathLike = Union[str, Path]
 
 logger = logging.getLogger(__name__)
+
+
+def load_zarr(
+    p: Union[PathLike, Iterable[PathLike]], dataset_name: str = "features"
+) -> Tensor:
+    """Loads embeddings from zarr files containing a features dataset
+
+    Args:
+        p: Path to zarr file or files
+        dataset_name: Name of the dataset containing the features. Defaults to "features".
+
+    Returns:
+        Tensor containing embeddings
+    """
+    if isinstance(p, list) and len(p) == 1:
+        p = p[0]
+
+    if isinstance(p, (str, Path)):
+        root = zarr.open(str(p), mode="r")
+        if dataset_name not in root:
+            raise ValueError(f"Dataset '{dataset_name}' not found in zarr file {p}")
+        # Convert to tensor
+        data = torch.tensor(root[dataset_name][:])
+        if data.ndim > 2:
+            data = data.squeeze(0)
+            assert data.ndim == 2
+        return data
+    else:
+        embeddings = []
+        for p_ in p:
+            root = zarr.open(str(p_), mode="r")
+            if dataset_name not in root:
+                raise ValueError(
+                    f"Dataset '{dataset_name}' not found in zarr file {p_}"
+                )
+            # Convert to tensor
+            embeddings.append(torch.tensor(root[dataset_name][:]))
+        return torch.cat(embeddings)
 
 
 def load_torch(p: Union[PathLike, Iterable[PathLike]]) -> Tensor:
@@ -278,6 +317,65 @@ class H5EmbeddingLoader(EmbeddingLoader):
                 self.lookup_embeddings_filepath(p) for p in embedding_filename_or_names
             ]
             embeddings = load_h5(paths, self.dataset_name)
+        return embeddings
+
+    def lookup_embeddings_filepath(self, embedding_filename: str) -> Path:
+        """
+        Finds the embedding filepath.
+
+        Args:
+            embedding_filename: The name of the embeddings file
+
+        Raises:
+            EmbeddingNotFoundError: If no embeddings were found.
+
+        Returns:
+            The path to the embeddings file.
+        """
+        embedding_path = self.embeddings_dir / (embedding_filename + self.extension)
+        if not embedding_path.exists():
+            raise EmbeddingNotFoundError(
+                f"embedding_path {embedding_path} does not exist"
+            )
+
+        return embedding_path
+
+
+class ZarrEmbeddingLoader(EmbeddingLoader):
+    """Loads embeddings from zarr files containing a features dataset."""
+
+    def __init__(
+        self,
+        embeddings_dir: Union[str, Path],
+        dataset_name: str = "features",
+        extension: str = ".zarr",
+    ):
+        """Initialize zarr embedding loader.
+
+        Args:
+            embeddings_dir: Directory expected to contain all zarr embedding files.
+            dataset_name: Name of the dataset containing the features. Defaults to "features".
+            extension: Embeddings file extension. Defaults to `.zarr`.
+        """
+        self.embeddings_dir = Path(embeddings_dir)
+        self.dataset_name = dataset_name
+        self.extension = extension
+
+    def load(self, embedding_filename_or_names: Union[str, Iterable[str]]) -> Tensor:
+        """
+        Loads embeddings for a given group name from zarr files.
+
+        Args:
+            embedding_filename_or_names: Identifies the name(s) of the embeddings filepaths to be loaded.
+        """
+        if isinstance(embedding_filename_or_names, str):
+            path = self.lookup_embeddings_filepath(embedding_filename_or_names)
+            embeddings = load_zarr(path, self.dataset_name)
+        else:
+            paths = [
+                self.lookup_embeddings_filepath(p) for p in embedding_filename_or_names
+            ]
+            embeddings = load_zarr(paths, self.dataset_name)
         return embeddings
 
     def lookup_embeddings_filepath(self, embedding_filename: str) -> Path:

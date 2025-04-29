@@ -11,6 +11,7 @@ from paige.ml_sdk.dataset_universe.embedding_loader import (
     FileSystemEmbeddingLoader,
     H5EmbeddingLoader,
     ParquetEmbeddingLoader,
+    ZarrEmbeddingLoader,
 )
 
 logger = logging.getLogger(__name__)
@@ -60,6 +61,10 @@ class EmbeddingDataset(Dataset[EmbeddingAggregatorFitDatasetItem]):
                 )
             case ".h5":
                 self.embedding_loader = H5EmbeddingLoader(embeddings_dir=embeddings_dir)
+            case ".zarr":
+                self.embedding_loader = ZarrEmbeddingLoader(
+                    embeddings_dir=embeddings_dir
+                )
             case _:
                 self.embedding_loader = FileSystemEmbeddingLoader(
                     embeddings_dir=embeddings_dir, extension=filename_extension

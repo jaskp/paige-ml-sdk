@@ -186,7 +186,8 @@ class EmbeddingAggregatorVariableSizeSequencesFitCollate:
         ]
 
         label_map_empty_values = [
-            torch.empty((len(batch),), dtype=label_dtype) for label_dtype in label_map_value_dtypes
+            torch.empty((len(batch),), dtype=torch.long)
+            for label_dtype in label_map_value_dtypes
         ]
         label_map_batch = dict(zip(label_map_keys, label_map_empty_values))
 
